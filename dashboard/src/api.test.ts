@@ -39,6 +39,17 @@ describe("createApi", () => {
     await expect(api.approve("1")).rejects.toEqual(new ApiError(409, "Approval is used"));
   });
 
+  it("calls a configured API origin", async () => {
+    const fetcher = fakeFetch(200, {});
+    await createApi("k", fetcher, "https://api.example.com").verify();
+    expect(fetcher.mock.calls[0][0]).toBe("https://api.example.com/api/v1/audit/verify");
+  });
+
+  it("refuses a non-JSON answer, such as a static host's own page", async () => {
+    const html = vi.fn(async () => new Response("<!doctype html>", { headers: { "Content-Type": "text/html" } }));
+    await expect(createApi("k", html).overview()).rejects.toMatchObject({ status: 0 });
+  });
+
   it("reports a backend that does not answer", async () => {
     const api = createApi("k", vi.fn(async () => Promise.reject(new TypeError("offline"))));
     await expect(api.verify()).rejects.toMatchObject({ status: 0 });

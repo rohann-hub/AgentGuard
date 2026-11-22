@@ -89,9 +89,13 @@ export class ApiError extends Error {
   }
 }
 
-const BASE = "/api/v1";
+// Empty: same origin (the backend serves the dashboard). Set VITE_API_BASE_URL when the
+// dashboard is hosted elsewhere, e.g. on Vercel: https://agentguard.example.com
+const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/+$/, "");
 
-export function createApi(adminKey: string, fetcher: typeof fetch = fetch) {
+export function createApi(adminKey: string, fetcher: typeof fetch = fetch, origin = API_ORIGIN) {
+  const BASE = `${origin}/api/v1`;
+
   async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
     let resp: Response;
     try {
@@ -106,7 +110,11 @@ export function createApi(adminKey: string, fetcher: typeof fetch = fetch) {
         cache: "no-store",
       });
     } catch {
-      throw new ApiError(0, "AgentGuard is not answering. Check that the backend is running.");
+      throw new ApiError(0, "AgentGuard is not answering. Check that the backend is up and allows this site in AGENTGUARD_CORS_ORIGINS.");
+    }
+    if (!resp.headers.get("content-type")?.includes("application/json")) {
+      // e.g. a static host answering /api/... with its own page: no backend behind it.
+      throw new ApiError(0, "No AgentGuard API answered here. Check the dashboard's API address.");
     }
     const body = await resp.json().catch(() => null);
     if (!resp.ok) {
