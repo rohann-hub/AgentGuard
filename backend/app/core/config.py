@@ -38,6 +38,9 @@ class Settings(BaseSettings):
             raise ValueError("admin_api_key_hash must be a lowercase SHA-256 hex digest")
         return v
 
+    # Firewall action per entity type, e.g. {"EMAIL": "allow"}. Default: secrets block, PII redacts.
+    firewall_actions: dict[str, Literal["block", "redact", "allow"]] = {}
+
     @property
     def docs_enabled(self) -> bool:
         return self.env != "production"

@@ -146,7 +146,19 @@ def test_allow_executes_tool(api, policy, tool_calls):
         "status": "success",
         "decision": "allow",
         "policy_version": "test-1",
-        "tool_result": {"customer": {"customer_id": 101, "name": "Asha Rao", "plan": "pro"}},
+        "tool_result": {
+            "customer": {
+                "customer_id": 101,
+                "name": "Asha Rao",
+                "email": "[REDACTED:EMAIL]",
+                "phone": "[REDACTED:PHONE]",
+                "plan": "pro",
+            }
+        },
+        "firewall": [
+            {"entity_type": "EMAIL", "path": "tool_result.customer.email", "action": "redact"},
+            {"entity_type": "PHONE", "path": "tool_result.customer.phone", "action": "redact"},
+        ],
     }
     assert tool_calls == [("database", "read")]
     assert calls == [
@@ -155,6 +167,7 @@ def test_allow_executes_tool(api, policy, tool_calls):
             "tool_name": "database",
             "action": "read",
             "arguments": {"customer_id": 101},
+            "firewall": [],
         }
     ]
 
@@ -176,7 +189,7 @@ def test_approval_required_does_not_execute(api, policy, tool_calls):
     body = resp.json()
     assert (body["status"], body["decision"]) == ("pending_approval", "approval_required")
     assert tool_calls == []
-    assert calls[0]["arguments"] == {"customer_id": 101, "amount": 8000.0}
+    assert calls[0]["arguments"] == {"customer_id": 101, "amount": 8000.0, "note": None}
 
 
 def test_fails_closed_when_opa_unavailable(api, monkeypatch, tool_calls):
@@ -280,3 +293,53 @@ async def test_opa_client_fails_closed_when_unreachable(monkeypatch):
     _opa_returning(monkeypatch, handler)
     with pytest.raises(PolicyUnavailableError):
         await opa_client.evaluate(get_settings(), {})
+
+
+# --- firewall ---
+
+
+def _refund_with(note):
+    return REFUND | {"arguments": {"customer_id": 101, "amount": 100, "note": note}}
+
+
+def test_secret_in_arguments_is_blocked_before_policy(api, policy, tool_calls):
+    calls = policy("allow")
+    resp = api.post(URL, json=_refund_with("use key AKIAIOSFODNN7EXAMPLE"))
+    assert resp.status_code == 403
+    body = resp.json()
+    assert body["reason"] == "Sensitive data in arguments"
+    assert body["firewall"] == [
+        {"entity_type": "AWS_ACCESS_KEY", "path": "arguments.note", "action": "block"}
+    ]
+    assert "AKIA" not in resp.text
+    assert calls == [] and tool_calls == []
+
+
+def test_pii_in_arguments_is_redacted_before_policy_and_tool(api, policy, tool_calls):
+    calls = policy("allow")
+    resp = api.post(URL, json=_refund_with("customer asha.rao@example.com asked"))
+    assert resp.status_code == 200
+    assert calls[0]["arguments"]["note"] == "customer [REDACTED:EMAIL] asked"
+    assert calls[0]["firewall"] == ["EMAIL"]
+    assert resp.json()["tool_result"]["note"] == "customer [REDACTED:EMAIL] asked"
+    assert "asha.rao" not in resp.text
+
+
+def test_firewall_actions_are_configurable(api, policy, monkeypatch):
+    monkeypatch.setenv("AGENTGUARD_FIREWALL_ACTIONS", json.dumps({"EMAIL": "allow"}))
+    get_settings.cache_clear()
+    policy("allow")
+    resp = api.post(URL, json=READ)
+    assert resp.json()["tool_result"]["customer"]["email"] == "asha.rao@example.com"
+
+
+def test_secret_in_tool_response_is_blocked(api, policy, monkeypatch):
+    async def leaky(_args):
+        return {"config": {"db_password": "hunter2"}}
+
+    _replace_handler(monkeypatch, leaky)
+    policy("allow")
+    resp = api.post(URL, json=READ)
+    assert resp.status_code == 403
+    assert resp.json()["reason"] == "Sensitive data in tool response"
+    assert "hunter2" not in resp.text
