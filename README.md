@@ -4,10 +4,11 @@ A security gateway that sits between AI agents and the tools, APIs and data they
 Every tool call is checked against policy (OPA), scanned for PII and secrets, approved by
 a human when risky, and written to a tamper-evident audit log.
 
-This repository is at **Phase 3: authentication & policy engine**. Agents are registered in
-PostgreSQL and call `POST /api/v1/proxy/execute` with their API key; AgentGuard validates the
-request against an explicit tool registry, asks OPA for a versioned decision, and runs the tool
-only when OPA allows it. The firewall, audit ledger and approval workflow arrive in later phases.
+This repository is at **Phase 4: PII & secret firewall**. Agents are registered in PostgreSQL
+and call `POST /api/v1/proxy/execute` with their API key; AgentGuard validates the request
+against an explicit tool registry, scans it for PII and secrets, asks OPA for a versioned
+decision, runs the tool only when allowed, and scans the response before returning it.
+The audit ledger and approval workflow arrive in later phases.
 
 **Guides for each phase are in [docs/](docs/README.md).**
 
@@ -21,6 +22,7 @@ backend/app/
   api/routes/proxy.py   POST /api/v1/proxy/execute
   api/routes/agents.py  admin APIs: register, list, get, revoke agents
   auth/api_keys.py      agent and admin API keys (stored as SHA-256 hashes)
+  firewall/             PII and secret detectors, redact/block scanner
   policy/opa_client.py  OPA decisions; any failure denies (fail closed)
   tools/registry.py     the only tools that can run, keyed by (tool_name, action)
   tools/mock_tools.py   mock customer database and payment tools
@@ -83,4 +85,5 @@ curl -s localhost:8000/api/v1/proxy/execute -H "X-API-Key: $AGENT_KEY" -H 'conte
 ```
 
 Read is allowed, delete is denied, refund needs approval, and if OPA or the database is
-down nothing runs. Details: [docs/phase-2.md](docs/phase-2.md), [docs/phase-3.md](docs/phase-3.md).
+down nothing runs. Secrets in arguments or responses block the call; PII is redacted.
+Details: [docs/](docs/README.md).

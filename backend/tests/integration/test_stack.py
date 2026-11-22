@@ -60,6 +60,22 @@ def test_read_customer_is_allowed_and_executed(agent):
     assert (body["status"], body["decision"]) == ("success", "allow")
     assert body["tool_result"]["customer"]["customer_id"] == 101
     assert body["policy_version"]
+    # Phase 4: PII in the response is redacted by the firewall.
+    assert body["tool_result"]["customer"]["email"] == "[REDACTED:EMAIL]"
+
+
+def test_secret_in_arguments_is_blocked(agent):
+    resp = _execute(
+        {
+            "tool_name": "payment",
+            "action": "refund",
+            "arguments": {"customer_id": 101, "amount": 10, "note": "key AKIAIOSFODNN7EXAMPLE"},
+        },
+        agent["api_key"],
+    )
+    assert resp.status_code == 403, resp.text
+    assert resp.json()["firewall"][0]["entity_type"] == "AWS_ACCESS_KEY"
+    assert "AKIA" not in resp.text
 
 
 def test_delete_customer_is_denied_by_policy(agent):
