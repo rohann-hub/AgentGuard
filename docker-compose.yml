@@ -5,12 +5,13 @@ name: agentguard
 services:
   backend:
     build: .
+    command: sh -c "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"
     environment:
       AGENTGUARD_ENV: ${AGENTGUARD_ENV:-development}
       AGENTGUARD_LOG_LEVEL: ${AGENTGUARD_LOG_LEVEL:-INFO}
       AGENTGUARD_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agentguard}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-agentguard}
       AGENTGUARD_OPA_URL: http://opa:8181
-      AGENTGUARD_AGENT_API_KEYS: ${AGENTGUARD_AGENT_API_KEYS:-{}}
+      AGENTGUARD_ADMIN_API_KEY_HASH: ${AGENTGUARD_ADMIN_API_KEY_HASH:-}
     ports:
       - "8000:8000"
     depends_on:

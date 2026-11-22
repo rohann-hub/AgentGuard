@@ -17,6 +17,7 @@ DECISION_PATH = "/v1/data/agentguard/decision"
 class PolicyDecision(BaseModel):
     status: Decision
     reason: str
+    policy_version: str
 
 
 class PolicyUnavailableError(Exception):

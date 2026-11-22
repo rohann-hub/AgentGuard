@@ -4,11 +4,11 @@ import json
 
 import httpx
 import pytest
-from fastapi.testclient import TestClient
+from sqlalchemy.exc import OperationalError
 
 from app.auth.api_keys import hash_api_key
 from app.core.config import get_settings
-from app.main import create_app
+from app.database.models import Agent
 from app.policy import opa_client
 from app.policy.opa_client import PolicyDecision, PolicyUnavailableError
 from app.tools.registry import REGISTRY
@@ -25,13 +25,11 @@ REFUND = {
 
 
 @pytest.fixture
-def api(monkeypatch):
-    monkeypatch.setenv(
-        "AGENTGUARD_AGENT_API_KEYS", json.dumps({"support-agent": hash_api_key(KEY)})
-    )
-    get_settings.cache_clear()
-    with TestClient(create_app(), headers={"X-API-Key": KEY}) as c:
-        yield c
+def api(db, make_client):
+    db.add(Agent(name="support-agent", status="active", api_key_hash=hash_api_key(KEY)))
+    db.add(Agent(name="old-agent", status="revoked", api_key_hash=hash_api_key("revoked-key")))
+    db.commit()
+    return make_client(headers={"X-API-Key": KEY})
 
 
 @pytest.fixture
@@ -42,7 +40,7 @@ def policy(monkeypatch):
     def set_decision(status, reason="test"):
         async def fake(_settings, policy_input):
             calls.append(policy_input)
-            return PolicyDecision(status=status, reason=reason)
+            return PolicyDecision(status=status, reason=reason, policy_version="test-1")
 
         monkeypatch.setattr(opa_client, "evaluate", fake)
         return calls
@@ -76,12 +74,23 @@ def test_rejects_missing_or_wrong_key(api, policy, tool_calls, headers):
     assert tool_calls == []
 
 
-def test_no_configured_keys_rejects_everyone(monkeypatch, policy):
-    monkeypatch.delenv("AGENTGUARD_AGENT_API_KEYS", raising=False)
-    get_settings.cache_clear()
+def test_revoked_agent_is_rejected(api, policy, tool_calls):
     policy("allow")
-    with TestClient(create_app()) as c:
-        assert c.post(URL, json=READ, headers={"X-API-Key": KEY}).status_code == 401
+    assert api.post(URL, json=READ, headers={"X-API-Key": "revoked-key"}).status_code == 401
+    assert tool_calls == []
+
+
+def test_auth_fails_closed_when_database_is_down(make_client, policy, monkeypatch, tool_calls):
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    async def broken(*_a, **_k):
+        raise OperationalError("SELECT", {}, ConnectionError("down"))
+
+    monkeypatch.setattr(AsyncSession, "scalar", broken)
+    policy("allow")
+    resp = make_client().post(URL, json=READ, headers={"X-API-Key": KEY})
+    assert resp.status_code == 503
+    assert tool_calls == []
 
 
 def test_agent_identity_comes_from_key_not_body(api, policy):
@@ -89,13 +98,6 @@ def test_agent_identity_comes_from_key_not_body(api, policy):
     calls = policy("allow")
     api.post(URL, json=READ)
     assert calls[0]["agent"] == "support-agent"
-
-
-def test_settings_reject_raw_keys(monkeypatch):
-    monkeypatch.setenv("AGENTGUARD_AGENT_API_KEYS", json.dumps({"a": "not-a-hash"}))
-    get_settings.cache_clear()
-    with pytest.raises(ValueError, match="SHA-256"):
-        get_settings()
 
 
 # --- request validation ---
@@ -143,6 +145,7 @@ def test_allow_executes_tool(api, policy, tool_calls):
         "request_id": "req_001",
         "status": "success",
         "decision": "allow",
+        "policy_version": "test-1",
         "tool_result": {"customer": {"customer_id": 101, "name": "Asha Rao", "plan": "pro"}},
     }
     assert tool_calls == [("database", "read")]
@@ -245,11 +248,13 @@ async def test_opa_client_parses_decision(monkeypatch):
     def handler(request):
         seen["path"] = request.url.path
         seen["body"] = json.loads(request.content)
-        return httpx.Response(200, json={"result": {"status": "allow", "reason": "ok"}})
+        return httpx.Response(
+            200, json={"result": {"status": "allow", "reason": "ok", "policy_version": "v1"}}
+        )
 
     _opa_returning(monkeypatch, handler)
     decision = await opa_client.evaluate(get_settings(), {"action": "read"})
-    assert decision == PolicyDecision(status="allow", reason="ok")
+    assert decision == PolicyDecision(status="allow", reason="ok", policy_version="v1")
     assert seen == {"path": "/v1/data/agentguard/decision", "body": {"input": {"action": "read"}}}
 
 

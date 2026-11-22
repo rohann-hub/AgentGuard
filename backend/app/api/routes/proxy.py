@@ -7,6 +7,7 @@ A tool runs only when OPA explicitly allows it.
 import asyncio
 import logging
 import uuid
+from functools import partial
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
@@ -60,7 +61,7 @@ async def execute(req: ProxyRequest, agent: AgentDep, settings: SettingsDep) -> 
         ) from exc
 
     policy_input = {
-        "agent": agent,
+        "agent": agent.name,
         "tool_name": tool.name,
         "action": tool.action,
         "arguments": args.model_dump(),
@@ -78,49 +79,40 @@ async def execute(req: ProxyRequest, agent: AgentDep, settings: SettingsDep) -> 
 
     # Never log arguments: they may hold PII or secrets.
     logger.info(
-        "request_id=%s agent=%s tool=%s.%s decision=%s",
+        "request_id=%s agent=%s tool=%s.%s decision=%s policy_version=%s",
         request_id,
-        agent,
+        agent.name,
         tool.name,
         tool.action,
         decision.status,
+        decision.policy_version,
+    )
+    reply = partial(
+        ProxyResponse,
+        request_id=request_id,
+        decision=decision.status,
+        policy_version=decision.policy_version,
     )
 
     if decision.status == "deny":
-        body = ProxyResponse(
-            request_id=request_id, status="blocked", decision="deny", reason=decision.reason
-        )
-        return _respond(body)
+        return _respond(reply(status="blocked", reason=decision.reason))
     if decision.status == "approval_required":
         # shortcut: nothing is stored yet; the Phase 6 approval workflow will persist it.
-        body = ProxyResponse(
-            request_id=request_id,
-            status="pending_approval",
-            decision="approval_required",
-            reason=decision.reason,
-        )
-        return _respond(body)
+        return _respond(reply(status="pending_approval", reason=decision.reason))
 
     try:
         result = await asyncio.wait_for(tool.handler(args), timeout=settings.tool_timeout_seconds)
     except ToolError as exc:
-        body = ProxyResponse(
-            request_id=request_id, status="failed", decision="allow", reason=str(exc)
+        return _respond(
+            reply(status="failed", reason=str(exc)), status.HTTP_422_UNPROCESSABLE_ENTITY
         )
-        return _respond(body, status.HTTP_422_UNPROCESSABLE_ENTITY)
     except TimeoutError:
-        body = ProxyResponse(
-            request_id=request_id, status="failed", decision="allow", reason="Tool timed out"
+        return _respond(
+            reply(status="failed", reason="Tool timed out"), status.HTTP_504_GATEWAY_TIMEOUT
         )
-        return _respond(body, status.HTTP_504_GATEWAY_TIMEOUT)
     except Exception:
         logger.exception("request_id=%s tool %s.%s crashed", request_id, tool.name, tool.action)
-        body = ProxyResponse(
-            request_id=request_id, status="failed", decision="allow", reason="Tool execution failed"
-        )
+        body = reply(status="failed", reason="Tool execution failed")
         return _respond(body, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    body = ProxyResponse(
-        request_id=request_id, status="success", decision="allow", tool_result=result
-    )
-    return _respond(body)
+    return _respond(reply(status="success", tool_result=result))
