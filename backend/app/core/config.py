@@ -43,6 +43,21 @@ class Settings(BaseSettings):
     # Folder holding the built admin dashboard, served at /dashboard. Empty: not served.
     dashboard_dir: str = ""
 
+    # Origins allowed to call the admin APIs from a browser, e.g. a dashboard on Vercel:
+    # ["https://agentguard-dashboard.vercel.app"]. Empty (default): no cross-origin access.
+    cors_origins: list[str] = []
+
+    @field_validator("cors_origins")
+    @classmethod
+    def _exact_origins(cls, v: list[str]) -> list[str]:
+        for origin in v:
+            scheme, _, rest = origin.partition("://")
+            if scheme not in ("https", "http") or not rest or "/" in rest or "*" in rest:
+                raise ValueError(
+                    f"cors_origins needs exact origins like https://host, got {origin!r}"
+                )
+        return v
+
     # Firewall action per entity type, e.g. {"EMAIL": "allow"}. Default: secrets block, PII redacts.
     firewall_actions: dict[str, Literal["block", "redact", "allow"]] = {}
 

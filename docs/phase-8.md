@@ -18,6 +18,7 @@ files at `/dashboard/`; there is no second service to run.
 | `backend/app/api/routes/audit.py` | Audit list gains `agent_name`, `decision` and `event_type` filters |
 | `Dockerfile` | A Node build stage; the final image has only the static files, no Node |
 | `.github/workflows/tests.yml` | New `dashboard` job: type check, tests, build |
+| `dashboard/vercel.json` | Optional hosting on Vercel (see below) |
 
 ## Screens
 
@@ -100,6 +101,7 @@ with no sideways scroll.
 | Where | What |
 |---|---|
 | `backend/tests/unit/test_overview.py` | Admin key required; counts, tools and policy version; renders when OPA is down; audit filters |
+| `backend/tests/unit/test_cors.py` | No cross-origin access by default; only listed origins; exact origins only |
 | `backend/tests/unit/test_dashboard.py` | Served with the security headers; no path traversal; off unless configured; fails fast on a bad folder |
 | `backend/tests/integration/test_stack.py` | The image serves the built dashboard; overview reads the live policy version |
 | `dashboard/src/api.test.ts` | Key sent only as a header, never in the URL; no cookies; ids escaped; errors surfaced |
@@ -119,3 +121,45 @@ the proxy), audit filters, and that the key is in no browser storage and is forg
 - **No live updates.** Use Refresh; nothing polls in the background.
 - **Counts on the overview** are computed on each request; fine at this scale, worth caching
   later.
+
+## Deploy the dashboard on Vercel
+
+The dashboard is a static site, so Vercel can host it. It only shows data when it can reach a
+running AgentGuard backend, which must be hosted separately (Vercel does not run the
+backend, PostgreSQL or OPA). The backend must be on **HTTPS**: a page on Vercel cannot call
+an `http://` API.
+
+`dashboard/vercel.json` sets the build (`DASHBOARD_BASE=/ npm run build`), the output folder
+(`dist`), a rewrite to `index.html`, and the same security headers the backend sends
+(`connect-src` allows `https:` so the page can reach your API).
+
+### Steps
+
+1. In Vercel: **Add New → Project**, import `rohann-hub/AgentGuard`.
+2. **Root Directory:** `dashboard`. Vercel then reads `dashboard/vercel.json`; leave the
+   framework, build and output settings as detected.
+3. **Environment Variables:** add `VITE_API_BASE_URL` = your backend's public HTTPS address,
+   with no trailing slash, e.g. `https://agentguard-api.example.com`.
+4. **Deploy.** Note the address Vercel gives you, e.g. `https://agentguard-dashboard.vercel.app`.
+5. On the backend, allow that exact address and restart it:
+
+   ```bash
+   AGENTGUARD_CORS_ORIGINS=["https://agentguard-dashboard.vercel.app"]
+   ```
+
+   Add each address that should work (a custom domain too). Wildcards are refused on
+   purpose. Vercel preview deployments get their own addresses and will not reach the API
+   unless you add them.
+6. Open the Vercel address and sign in with the admin key.
+
+If sign-in says "No AgentGuard API answered here", `VITE_API_BASE_URL` is missing (it is
+read at build time, so redeploy after setting it). If it says "AgentGuard is not answering",
+the backend is down, not on HTTPS, or the Vercel address is not in `AGENTGUARD_CORS_ORIGINS`.
+
+### What changes on the backend
+
+- `AGENTGUARD_CORS_ORIGINS` (JSON list, default `[]`): exact browser origins allowed to call
+  the APIs. Only `GET` and `POST`, only the `X-Admin-Key`, `Content-Type` and `Accept`
+  headers, never cookies. Empty means no cross-origin access, as before.
+- The admin key still travels only as a header, now across origins, so serve the backend
+  over HTTPS and keep the allow-list short.
