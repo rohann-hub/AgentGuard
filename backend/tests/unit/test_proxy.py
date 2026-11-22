@@ -6,14 +6,12 @@ import httpx
 import pytest
 from sqlalchemy.exc import OperationalError
 
-from app.auth.api_keys import hash_api_key
 from app.core.config import get_settings
-from app.database.models import Agent
 from app.policy import opa_client
 from app.policy.opa_client import PolicyDecision, PolicyUnavailableError
 from app.tools.registry import REGISTRY
+from tests.unit.conftest import AGENT_KEY as KEY
 
-KEY = "test-key-support"
 URL = "/api/v1/proxy/execute"
 READ = {"tool_name": "database", "action": "read", "arguments": {"customer_id": 101}}
 DELETE = {"tool_name": "database", "action": "delete", "arguments": {"customer_id": 101}}
@@ -22,44 +20,6 @@ REFUND = {
     "action": "refund",
     "arguments": {"customer_id": 101, "amount": 8000},
 }
-
-
-@pytest.fixture
-def api(db, make_client):
-    db.add(Agent(name="support-agent", status="active", api_key_hash=hash_api_key(KEY)))
-    db.add(Agent(name="old-agent", status="revoked", api_key_hash=hash_api_key("revoked-key")))
-    db.commit()
-    return make_client(headers={"X-API-Key": KEY})
-
-
-@pytest.fixture
-def policy(monkeypatch):
-    """Replace OPA with a fixed decision and record what it was asked."""
-    calls = []
-
-    def set_decision(status, reason="test"):
-        async def fake(_settings, policy_input):
-            calls.append(policy_input)
-            return PolicyDecision(status=status, reason=reason, policy_version="test-1")
-
-        monkeypatch.setattr(opa_client, "evaluate", fake)
-        return calls
-
-    return set_decision
-
-
-@pytest.fixture
-def tool_calls(monkeypatch):
-    """Wrap every registered tool so tests can see whether it ran."""
-    calls = []
-    for key, tool in list(REGISTRY.items()):
-
-        async def spy(args, _orig=tool.handler, _key=key):
-            calls.append(_key)
-            return await _orig(args)
-
-        monkeypatch.setitem(REGISTRY, key, dataclasses.replace(tool, handler=spy))
-    return calls
 
 
 # --- authentication ---

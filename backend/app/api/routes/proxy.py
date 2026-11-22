@@ -1,8 +1,10 @@
 """POST /api/v1/proxy/execute: the single path from agents to tools.
 
-Order: authenticate -> look up tool -> validate arguments -> firewall scan of arguments
--> OPA decision -> execute -> firewall scan of the response.
-A tool runs only when OPA explicitly allows it and the firewall did not block.
+authenticate -> look up tool -> validate arguments -> firewall (arguments) -> OPA
+-> audit decision -> execute -> firewall (response) -> audit result.
+
+A tool runs only when OPA allows it, the firewall did not block, and the decision was
+written to the audit ledger first.
 """
 
 import asyncio
@@ -13,12 +15,14 @@ from functools import partial
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 
-from app.api.dependencies import SettingsDep
+from app.api.dependencies import SessionDep, SettingsDep
+from app.audit import ledger
 from app.auth.api_keys import AgentDep
-from app.firewall.scanner import Finding, scan
+from app.firewall.scanner import scan
 from app.policy import opa_client
-from app.schemas.proxy import ProxyRequest, ProxyResponse
+from app.schemas.proxy import FirewallFinding, ProxyRequest, ProxyResponse
 from app.tools.errors import ToolError
 from app.tools.registry import get_tool
 
@@ -32,20 +36,14 @@ _STATUS_CODES = {
 }
 
 
+class _AuditUnavailableError(Exception):
+    pass
+
+
 def _invalid(exc: ValidationError) -> HTTPException:
     return HTTPException(
         status.HTTP_422_UNPROCESSABLE_ENTITY,
         exc.errors(include_url=False, include_input=False, include_context=False),
-    )
-
-
-def _findings(findings: list[Finding]) -> list[dict] | None:
-    return [vars(f) for f in findings] or None
-
-
-def _respond(body: ProxyResponse, code: int | None = None) -> JSONResponse:
-    return JSONResponse(
-        body.model_dump(exclude_none=True), status_code=code or _STATUS_CODES[body.status]
     )
 
 
@@ -55,11 +53,14 @@ def _respond(body: ProxyResponse, code: int | None = None) -> JSONResponse:
     response_model_exclude_none=True,
     responses={
         202: {"model": ProxyResponse, "description": "Pending approval; the tool did not run"},
-        403: {"model": ProxyResponse, "description": "Denied by policy"},
-        503: {"model": ProxyResponse, "description": "Policy engine unavailable (fail closed)"},
+        403: {"model": ProxyResponse, "description": "Blocked by policy or firewall"},
+        409: {"description": "request_id already used by this agent"},
+        503: {"model": ProxyResponse, "description": "Policy engine or audit unavailable"},
     },
 )
-async def execute(req: ProxyRequest, agent: AgentDep, settings: SettingsDep) -> JSONResponse:
+async def execute(
+    req: ProxyRequest, agent: AgentDep, settings: SettingsDep, session: SessionDep
+) -> JSONResponse:
     request_id = req.request_id or f"req_{uuid.uuid4().hex}"
 
     tool = get_tool(req.tool_name, req.action)
@@ -71,26 +72,76 @@ async def execute(req: ProxyRequest, agent: AgentDep, settings: SettingsDep) -> 
         raise _invalid(exc) from exc
 
     arg_scan = scan(args.model_dump(), settings.firewall_actions, "arguments")
-    findings = arg_scan.findings
-    if arg_scan.blocked:
-        body = ProxyResponse(
-            request_id=request_id,
-            status="blocked",
-            reason="Sensitive data in arguments",
-            firewall=_findings(findings),
+    findings = list(arg_scan.findings)
+    record = partial(
+        ledger.append,
+        session,
+        agent=agent,
+        request_id=request_id,
+        tool_name=tool.name,
+        action=tool.action,
+        request_fingerprint=ledger.fingerprint(arg_scan.data),
+    )
+
+    async def audit(event_type: str, reason: str | None, **fields) -> None:
+        # Reasons can echo tool errors, so they pass through the firewall before storage.
+        safe_reason = scan(reason, settings.firewall_actions, "reason").data
+        try:
+            await record(
+                event_type=event_type,
+                reason=safe_reason,
+                firewall=[vars(f) for f in findings],
+                **fields,
+            )
+            await session.commit()
+        except ledger.DuplicateRequestError:
+            raise HTTPException(status.HTTP_409_CONFLICT, "request_id already used") from None
+        except SQLAlchemyError as exc:
+            logger.error("request_id=%s audit write failed: %s", request_id, exc)
+            raise _AuditUnavailableError from exc
+
+    async def finish(
+        body: ProxyResponse, code: int | None = None, event_type: str = "decision"
+    ) -> JSONResponse:
+        body.firewall = [FirewallFinding(**vars(f)) for f in findings] or None
+        try:
+            await audit(
+                event_type,
+                **body.model_dump(include={"decision", "status", "reason", "policy_version"}),
+                response_fingerprint=(
+                    ledger.fingerprint(body.tool_result) if body.tool_result is not None else None
+                ),
+            )
+        except _AuditUnavailableError:
+            # Nothing leaves the gateway unaudited, including a result the tool already produced.
+            reason = "Audit unavailable"
+            if event_type == "execution":
+                reason += "; the tool ran but its result was withheld"
+            body = ProxyResponse(request_id=request_id, status="blocked", reason=reason)
+            code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return JSONResponse(
+            body.model_dump(mode="json", exclude_none=True),
+            status_code=code or _STATUS_CODES[body.status],
         )
-        return _respond(body)
+
+    if arg_scan.blocked:
+        return await finish(
+            ProxyResponse(
+                request_id=request_id, status="blocked", reason="Sensitive data in arguments"
+            )
+        )
     if findings:
         try:
             args = tool.args_model.model_validate(arg_scan.data)
         except ValidationError as exc:
             raise _invalid(exc) from exc
+    arguments = args.model_dump()
 
     policy_input = {
         "agent": agent.name,
         "tool_name": tool.name,
         "action": tool.action,
-        "arguments": args.model_dump(),
+        "arguments": arguments,
         "firewall": sorted({f.entity_type for f in findings}),
     }
     try:
@@ -102,7 +153,8 @@ async def execute(req: ProxyRequest, agent: AgentDep, settings: SettingsDep) -> 
             decision="deny",
             reason="Policy engine unavailable",
         )
-        return _respond(body, status.HTTP_503_SERVICE_UNAVAILABLE)
+        # "error" events do not consume the request_id, so the agent can retry.
+        return await finish(body, status.HTTP_503_SERVICE_UNAVAILABLE, event_type="error")
 
     # Never log arguments: they may hold PII or secrets.
     logger.info(
@@ -122,33 +174,45 @@ async def execute(req: ProxyRequest, agent: AgentDep, settings: SettingsDep) -> 
     )
 
     if decision.status == "deny":
-        return _respond(reply(status="blocked", reason=decision.reason))
+        return await finish(reply(status="blocked", reason=decision.reason))
+
     if decision.status == "approval_required":
         # shortcut: nothing is stored yet; the Phase 6 approval workflow will persist it.
-        return _respond(reply(status="pending_approval", reason=decision.reason))
+        return await finish(reply(status="pending_approval", reason=decision.reason))
+
+    # The decision must be on the ledger before the tool runs.
+    try:
+        await audit(
+            "decision",
+            decision=decision.status,
+            status="executing",
+            reason=decision.reason,
+            policy_version=decision.policy_version,
+        )
+    except _AuditUnavailableError:
+        body = ProxyResponse(request_id=request_id, status="blocked", reason="Audit unavailable")
+        return JSONResponse(
+            body.model_dump(exclude_none=True), status_code=status.HTTP_503_SERVICE_UNAVAILABLE
+        )
+    done = partial(finish, event_type="execution")
 
     try:
         result = await asyncio.wait_for(tool.handler(args), timeout=settings.tool_timeout_seconds)
     except ToolError as exc:
-        return _respond(
+        return await done(
             reply(status="failed", reason=str(exc)), status.HTTP_422_UNPROCESSABLE_ENTITY
         )
     except TimeoutError:
-        return _respond(
+        return await done(
             reply(status="failed", reason="Tool timed out"), status.HTTP_504_GATEWAY_TIMEOUT
         )
     except Exception:
         logger.exception("request_id=%s tool %s.%s crashed", request_id, tool.name, tool.action)
         body = reply(status="failed", reason="Tool execution failed")
-        return _respond(body, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return await done(body, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     result_scan = scan(result, settings.firewall_actions, "tool_result")
-    findings = findings + result_scan.findings
+    findings += result_scan.findings
     if result_scan.blocked:
-        body = reply(
-            status="blocked", reason="Sensitive data in tool response", firewall=_findings(findings)
-        )
-        return _respond(body)
-    return _respond(
-        reply(status="success", tool_result=result_scan.data, firewall=_findings(findings))
-    )
+        return await done(reply(status="blocked", reason="Sensitive data in tool response"))
+    return await done(reply(status="success", tool_result=result_scan.data))
