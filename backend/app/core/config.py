@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     dependency_timeout_seconds: float = Field(default=2.0, gt=0)
     tool_timeout_seconds: float = Field(default=5.0, gt=0)
     approval_ttl_seconds: int = Field(default=3600, gt=0)
+    max_request_bytes: int = Field(default=64 * 1024, gt=0)
 
     # SHA-256 hex of the admin key that protects /api/v1/agents. Empty disables admin APIs.
     admin_api_key_hash: str = ""
