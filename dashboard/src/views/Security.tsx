@@ -14,6 +14,7 @@ export function SecurityView() {
     <>
       <PageHeader
         title="Security events"
+        tagline="What the firewall caught."
         lead={`Denied calls and everything the firewall caught in the latest ${SCAN.toLocaleString()} audit events. Secrets block the call; personal data is redacted before policy and the tool see it.`}
         actions={
           <button type="button" className="btn btn--secondary" onClick={events.reload}>

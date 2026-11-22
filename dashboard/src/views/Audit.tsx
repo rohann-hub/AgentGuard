@@ -23,6 +23,7 @@ export function AuditView() {
     <>
       <PageHeader
         title="Audit log"
+        tagline="Every decision, chained."
         lead="Every decision and every execution, newest first. Arguments and responses are stored only as fingerprints, so nothing sensitive is shown here."
       />
       {events.error && <Notice>{events.error}</Notice>}

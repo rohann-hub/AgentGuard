@@ -28,6 +28,7 @@ export function OverviewView() {
     <>
       <PageHeader
         title="Overview"
+        tagline="What policy decided."
         lead="Every tool call an agent makes passes the firewall and policy before it runs. Here is what they decided."
         actions={
           <button
@@ -44,11 +45,11 @@ export function OverviewView() {
       />
       {overview.error && <Notice>{overview.error}</Notice>}
 
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {stats.map((s) => (
-          <div key={s.label} className="bg-surface px-5 py-5">
+          <div key={s.label} className="surface rounded-lg border border-line px-5 py-5">
             <p className="text-[13px] font-medium text-muted">{s.label}</p>
-            <p className="mt-2 font-mono text-[34px] leading-none font-medium tracking-[-0.02em] text-ink tabular-nums">
+            <p className="mt-3 font-display text-[52px] leading-[0.9] text-ink tabular-nums">
               {o ? s.value.toLocaleString() : "–"}
             </p>
             <p className="mt-2 text-[14px] text-text">{s.note}</p>

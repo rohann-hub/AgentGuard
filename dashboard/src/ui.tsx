@@ -64,12 +64,25 @@ export function useAction() {
 
 // --- building blocks ---
 
-export function PageHeader({ title, lead, actions }: { title: string; lead: ReactNode; actions?: ReactNode }) {
+export function PageHeader({
+  title,
+  tagline,
+  lead,
+  actions,
+}: {
+  title: string;
+  tagline: string;
+  lead: ReactNode;
+  actions?: ReactNode;
+}) {
   return (
-    <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mb-10 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h1 className="text-[28px] leading-tight font-semibold tracking-[-0.01em] text-ink">{title}</h1>
-        <p className="mt-2 max-w-[62ch] text-base leading-relaxed text-text">{lead}</p>
+        <h1 className="font-display text-[44px] leading-[1] font-normal tracking-[-0.015em] text-ink sm:text-[56px]">
+          {title}
+          <span className="block text-display-soft">{tagline}</span>
+        </h1>
+        <p className="mt-5 max-w-[62ch] text-base leading-relaxed text-text">{lead}</p>
       </div>
       {actions && <div className="flex shrink-0 gap-3">{actions}</div>}
     </div>
@@ -78,14 +91,14 @@ export function PageHeader({ title, lead, actions }: { title: string; lead: Reac
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <section className={`rounded-lg border border-line bg-surface ${className}`}>{children}</section>
+    <section className={`surface rounded-lg border border-line ${className}`}>{children}</section>
   );
 }
 
 export function CardHead({ title, meta }: { title: string; meta?: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-line px-5 py-4">
-      <h2 className="text-base font-medium text-ink">{title}</h2>
+      <h2 className="text-base font-semibold text-ink">{title}</h2>
       {meta && <div className="text-[13px] text-muted">{meta}</div>}
     </div>
   );

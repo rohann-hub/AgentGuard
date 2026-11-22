@@ -54,11 +54,11 @@ export function App() {
     <Session.Provider value={session}>
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-4 focus:z-20 focus:rounded-md focus:bg-ink focus:px-4 focus:py-2 focus:text-on-ink"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-4 focus:z-20 focus:rounded-md focus:bg-accent focus:px-4 focus:py-2 focus:text-on-accent"
       >
         Skip to content
       </a>
-      <header className="sticky top-0 z-10 border-b border-line bg-ground">
+      <header className="surface sticky top-0 z-10 border-b border-line">
         <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-x-8 px-4 sm:h-16 sm:flex-nowrap sm:px-8">
           <span className="flex h-14 items-center sm:h-auto">
             <Wordmark />
@@ -78,7 +78,7 @@ export function App() {
                 {v.label}
                 <span
                   aria-hidden
-                  className={`absolute inset-x-3 bottom-0 sm:-bottom-[10px] h-0.5 bg-ink transition-transform duration-200 ${
+                  className={`absolute inset-x-3 bottom-0 sm:-bottom-[10px] h-0.5 bg-moonstone transition-transform duration-200 ${
                     v.id === view ? "scale-x-100" : "scale-x-0"
                   }`}
                 />
@@ -101,13 +101,13 @@ function Wordmark() {
   return (
     <span className="flex shrink-0 items-center gap-2 text-[17px] font-semibold tracking-[-0.01em] text-ink">
       <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden>
-        <rect width="24" height="24" rx="5" className="fill-ink" />
+        <rect width="24" height="24" rx="5" className="fill-accent" />
         <path
           d="M12 5l6 2.4v4.3c0 3.6-2.5 6.3-6 7.3-3.5-1-6-3.7-6-7.3V7.4z"
           fill="none"
           strokeWidth="1.8"
           strokeLinejoin="round"
-          className="stroke-on-ink"
+          className="stroke-on-accent"
         />
       </svg>
       AgentGuard
@@ -144,12 +144,13 @@ function SignIn({ notice, onSignIn }: { notice: string | null; onSignIn: (key: s
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-16">
-      <div className="w-full max-w-[420px]">
+      <div className="surface w-full max-w-[460px] rounded-lg border border-line px-8 py-10 sm:px-10">
         <Wordmark />
-        <h1 className="mt-10 text-[28px] leading-tight font-semibold tracking-[-0.01em] text-ink">
-          Review what your agents are doing
+        <h1 className="mt-12 font-display text-[52px] leading-[0.98] font-normal tracking-[-0.015em] text-ink">
+          Review what
+          <span className="block text-display-soft">your agents do.</span>
         </h1>
-        <p className="mt-3 text-base leading-relaxed text-text">
+        <p className="mt-5 text-base leading-relaxed text-text">
           Approve held refunds, revoke agents and check the audit chain. Sign in with the admin key.
         </p>
         <form onSubmit={submit} noValidate className="mt-8">

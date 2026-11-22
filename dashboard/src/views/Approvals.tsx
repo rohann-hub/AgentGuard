@@ -30,6 +30,7 @@ export function ApprovalsView() {
     <>
       <PageHeader
         title="Approvals"
+        tagline="Held for a person."
         lead="Requests that policy held for a person. Approving lets the agent resubmit the same request once, within the hour. Policy runs again when it does."
         actions={
           <button type="button" className="btn btn--secondary" onClick={approvals.reload}>
@@ -50,7 +51,7 @@ export function ApprovalsView() {
             type="button"
             aria-pressed={filter === f.id}
             onClick={() => setFilter(f.id)}
-            className="h-9 rounded-md border border-line-strong px-3 text-[14px] font-medium text-text transition-colors duration-150 hover:border-ink hover:text-ink aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-on-ink"
+            className="h-9 rounded-md border border-line-strong px-3 text-[14px] font-medium text-text transition-colors duration-150 surface hover:border-accent hover:text-accent aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-on-accent"
           >
             {f.label}
           </button>

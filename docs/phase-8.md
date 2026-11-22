@@ -74,16 +74,26 @@ For working on the UI, `npm run dev` serves it on http://localhost:5173/dashboar
   and findings carry entity types and paths, never values. Approvals show arguments after the
   firewall redacted them.
 - **Policy is read-only here.** Rego changes still go through files, `opa test` and a PR.
-- Fonts are bundled (IBM Plex), so the page makes no third-party requests.
+- Fonts are bundled, so the page makes no third-party requests.
 
 ## Design
 
-Built with the taste-skill guidelines, adapted to an admin tool: warm neutral grounds and one
-near-black ink, colour only for state (allowed, denied, waiting), one teal accent for focus and
-links, sharp 4/6/8 radii, IBM Plex Sans with Plex Mono for ids and hashes, 44px controls,
-buttons that step up on hover and sink on press, no scroll animations. Light and dark follow
-the system setting. Every control has a visible label or an accessible name, focus rings show
-at once, and it works at phone width with no sideways scroll.
+The look follows the reference Soumik chose: an airy light ground with soft iridescent arcs
+(pure CSS, no images), translucent white cards, and the **Vanilla `#FFEBAF`** and
+**Moonstone `#4C9DB0`** palette. Headings are set in Instrument Serif, a high-contrast
+display serif, with a moonstone second line under each title; data and controls use
+Instrument Sans, and ids and hashes IBM Plex Mono. All fonts are bundled.
+
+Moonstone is too light for small text on white (3.1:1), so text, links, focus rings and the
+primary button use a deeper moonstone (`#2B6676`, 6:1), with vanilla text on that button
+(5.4:1). Pure moonstone is kept for large type and decoration; vanilla marks things waiting
+on a person. Body text is 7:1 or more and muted labels 4.5:1 or more.
+
+Built with the taste-skill guidelines, adapted to an admin tool: one accent family, colour
+only for state, sharp 4/6/8 radii, 44px controls, buttons that step up on hover and sink on
+press, no scroll animations. Light and dark follow the system setting. Every control has a
+visible label or an accessible name, focus rings show at once, and it works at phone width
+with no sideways scroll.
 
 ## Tests
 

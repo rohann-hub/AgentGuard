@@ -1,51 +1,69 @@
 @import "tailwindcss";
 
-/* One system: warm neutral grounds, one near-black ink, one accent (teal) for focus,
-   links and the live state. Status tones are quiet tints, never a row of bright dots. */
+/* Palette: Vanilla #FFEBAF and Moonstone #4C9DB0 on an airy, iridescent light ground.
+   Moonstone itself is too light for small text (3.1:1), so text, links, focus and the primary
+   button use a deeper moonstone (6:1+); the pure tone is kept for fills, rings and large type. */
 :root {
-  --ag-ground: #f4f3ef;
-  --ag-surface: #ffffff;
-  --ag-sunken: #ecebe6;
-  --ag-ink: #1b1a17;
-  --ag-text: #37352f;
-  --ag-muted: #67645b;
-  --ag-line: rgb(27 26 23 / 0.12);
-  --ag-line-strong: rgb(27 26 23 / 0.24);
-  --ag-accent: #0a6b6b;
-  --ag-on-ink: #f4f3ef;
-  --ag-allow: #2b6436;
-  --ag-allow-bg: #e3ede0;
+  --ag-vanilla: #ffebaf;
+  --ag-moonstone: #4c9db0;
+  --ag-ground: #f7f8f6;
+  --ag-surface: rgb(255 255 255 / 0.82);
+  --ag-sunken: rgb(76 157 176 / 0.07);
+  --ag-ink: #14272c;
+  --ag-text: #2c3e43;
+  --ag-muted: #5d6b6a;
+  --ag-line: rgb(20 39 44 / 0.1);
+  --ag-line-strong: rgb(20 39 44 / 0.22);
+  --ag-accent: #2b6676;
+  --ag-display-soft: #3e8799;
+  --ag-on-accent: #ffebaf;
+  --ag-allow: #22606f;
+  --ag-allow-bg: rgb(76 157 176 / 0.16);
   --ag-deny: #9a2a20;
-  --ag-deny-bg: #f5e2de;
-  --ag-wait: #7f5300;
-  --ag-wait-bg: #f3e9d3;
+  --ag-deny-bg: #f8e3df;
+  --ag-wait: #6f5200;
+  --ag-wait-bg: #ffebaf;
+  --ag-arc-a: rgb(76 157 176 / 0.3);
+  --ag-arc-b: rgb(255 214 120 / 0.42);
+  --ag-arc-c: rgb(150 196 236 / 0.42);
+  --ag-glow-a: rgb(255 235 175 / 0.55);
+  --ag-glow-b: rgb(76 157 176 / 0.18);
+  --ag-sheen: rgb(255 255 255 / 0.65);
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ag-ground: #0e0e0d;
-    --ag-surface: #171715;
-    --ag-sunken: #1f1f1c;
-    --ag-ink: #ecebe6;
-    --ag-text: #d6d4cd;
-    --ag-muted: #9e9b91;
-    --ag-line: rgb(236 235 230 / 0.12);
-    --ag-line-strong: rgb(236 235 230 / 0.26);
-    --ag-accent: #5cc4c0;
-    --ag-on-ink: #121211;
-    --ag-allow: #8fcf98;
-    --ag-allow-bg: rgb(143 207 152 / 0.12);
+    --ag-ground: #0e1b1f;
+    --ag-surface: rgb(22 40 46 / 0.72);
+    --ag-sunken: rgb(140 199 213 / 0.08);
+    --ag-ink: #f6f1e1;
+    --ag-text: #d9dcd6;
+    --ag-muted: #9fb0b1;
+    --ag-line: rgb(246 241 225 / 0.1);
+    --ag-line-strong: rgb(246 241 225 / 0.24);
+    --ag-accent: #8cc7d5;
+    --ag-display-soft: #8cc7d5;
+    --ag-on-accent: #0e1b1f;
+    --ag-allow: #9fd3df;
+    --ag-allow-bg: rgb(76 157 176 / 0.2);
     --ag-deny: #f0a197;
-    --ag-deny-bg: rgb(240 161 151 / 0.12);
-    --ag-wait: #e6c27a;
-    --ag-wait-bg: rgb(230 194 122 / 0.12);
+    --ag-deny-bg: rgb(240 161 151 / 0.13);
+    --ag-wait: #ffebaf;
+    --ag-wait-bg: rgb(255 235 175 / 0.14);
+    --ag-arc-a: rgb(76 157 176 / 0.22);
+    --ag-arc-b: rgb(255 235 175 / 0.1);
+    --ag-arc-c: rgb(120 170 220 / 0.14);
+    --ag-glow-a: rgb(255 235 175 / 0.07);
+    --ag-glow-b: rgb(76 157 176 / 0.16);
+    --ag-sheen: rgb(255 255 255 / 0.05);
     color-scheme: dark;
   }
 }
 
 @theme inline {
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
   --color-ground: var(--ag-ground);
   --color-surface: var(--ag-surface);
@@ -56,7 +74,10 @@
   --color-line: var(--ag-line);
   --color-line-strong: var(--ag-line-strong);
   --color-accent: var(--ag-accent);
-  --color-on-ink: var(--ag-on-ink);
+  --color-on-accent: var(--ag-on-accent);
+  --color-display-soft: var(--ag-display-soft);
+  --color-moonstone: var(--ag-moonstone);
+  --color-vanilla: var(--ag-vanilla);
   --color-allow: var(--ag-allow);
   --color-allow-bg: var(--ag-allow-bg);
   --color-deny: var(--ag-deny);
@@ -80,7 +101,27 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--ag-ground);
+  /* transparent so the fixed ground below shows; html holds the base colour */
+  background: transparent;
+}
+
+/* The airy ground: soft glows and thin iridescent arcs, fixed behind everything.
+   Pure CSS (no images), so it costs nothing to load and respects the CSP. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -40px;
+  z-index: -1;
+  pointer-events: none;
+  /* Each arc fades in, peaks with a white sheen, and fades out, like light through glass. */
+  background:
+    radial-gradient(circle at 112% -30%, transparent 0 44%, var(--ag-arc-c) 46%, var(--ag-sheen) 47%, var(--ag-arc-b) 48.5%, transparent 51%),
+    radial-gradient(circle at 128% -12%, transparent 0 52%, var(--ag-arc-a) 54.5%, var(--ag-sheen) 55.5%, transparent 58%),
+    radial-gradient(circle at -24% 132%, transparent 0 42%, var(--ag-arc-b) 44.5%, var(--ag-sheen) 45.5%, var(--ag-arc-a) 47%, transparent 49.5%),
+    radial-gradient(ellipse 55% 45% at 96% 4%, var(--ag-glow-a), transparent 72%),
+    radial-gradient(ellipse 50% 45% at 0% 100%, var(--ag-glow-b), transparent 72%),
+    var(--ag-ground);
+  filter: blur(14px);
 }
 
 :focus-visible {
@@ -92,7 +133,22 @@ body {
   background: color-mix(in oklab, var(--ag-accent) 25%, transparent);
 }
 
+@media (prefers-color-scheme: dark) {
+  .btn--secondary,
+  .field {
+    background: rgb(14 27 31 / 0.6) !important;
+  }
+}
+
 @layer components {
+  /* Cards: translucent white over the airy ground, a hairline, no heavy shadow. */
+  .surface {
+    background: var(--ag-surface);
+    backdrop-filter: blur(24px) saturate(1.15);
+    -webkit-backdrop-filter: blur(24px) saturate(1.15);
+  }
+
+
   /* Buttons: 44px, step 1px up on hover, sink and scale .985 on press. */
   .btn {
     display: inline-flex;
@@ -117,11 +173,11 @@ body {
     opacity: 0.5;
   }
   .btn--primary {
-    background: var(--ag-ink);
-    color: var(--ag-on-ink);
+    background: var(--ag-accent);
+    color: var(--ag-on-accent);
   }
   .btn--secondary {
-    background: var(--ag-surface);
+    background: rgb(255 255 255 / 0.5);
     color: var(--ag-ink);
     border-color: var(--ag-line-strong);
   }
@@ -141,7 +197,7 @@ body {
       transition-duration: 150ms;
     }
     .btn--primary:not(:disabled):hover {
-      background: color-mix(in oklab, var(--ag-ink) 86%, var(--ag-ground));
+      background: color-mix(in oklab, var(--ag-accent) 86%, var(--ag-ink));
     }
     .btn--secondary:not(:disabled):hover,
     .btn--danger:not(:disabled):hover {
@@ -171,7 +227,7 @@ body {
     width: 100%;
     border-radius: var(--radius-md);
     border: 1px solid var(--ag-line-strong);
-    background: var(--ag-surface);
+    background: rgb(255 255 255 / 0.85);
     color: var(--ag-ink);
     padding: 0 12px;
     font-size: 16px;

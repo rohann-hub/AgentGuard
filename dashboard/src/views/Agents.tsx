@@ -34,6 +34,7 @@ export function AgentsView() {
     <>
       <PageHeader
         title="Agents"
+        tagline="Who holds a key."
         lead="Each agent calls AgentGuard with its own key. Revoking an agent stops its key at once; past audit events stay."
       />
       {(agents.error || action.error) && (
