@@ -1,16 +1,18 @@
 """POST /api/v1/proxy/execute: the single path from agents to tools.
 
-authenticate -> look up tool -> validate arguments -> firewall (arguments) -> OPA
--> audit decision -> execute -> firewall (response) -> audit result.
+authenticate -> look up tool -> validate arguments -> firewall (arguments)
+-> verification (trusted data) -> OPA -> [approval] -> audit decision -> execute
+-> firewall (response) -> audit result.
 
-A tool runs only when OPA allows it, the firewall did not block, and the decision was
-written to the audit ledger first.
+A tool runs only when OPA allows it (or a human approved this exact request), the
+firewall did not block, and the decision was written to the audit ledger first.
 """
 
 import asyncio
 import logging
 import uuid
 from functools import partial
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
@@ -18,6 +20,7 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.dependencies import SessionDep, SettingsDep
+from app.approvals import service as approvals
 from app.audit import ledger
 from app.auth.api_keys import AgentDep
 from app.firewall.scanner import scan
@@ -53,7 +56,10 @@ def _invalid(exc: ValidationError) -> HTTPException:
     response_model_exclude_none=True,
     responses={
         202: {"model": ProxyResponse, "description": "Pending approval; the tool did not run"},
-        403: {"model": ProxyResponse, "description": "Blocked by policy or firewall"},
+        403: {
+            "model": ProxyResponse,
+            "description": "Blocked by policy, firewall or approval check",
+        },
         409: {"description": "request_id already used by this agent"},
         503: {"model": ProxyResponse, "description": "Policy engine or audit unavailable"},
     },
@@ -83,7 +89,7 @@ async def execute(
         request_fingerprint=ledger.fingerprint(arg_scan.data),
     )
 
-    async def audit(event_type: str, reason: str | None, **fields) -> None:
+    async def audit(event_type: str, reason: str | None, **fields: Any) -> None:
         # Reasons can echo tool errors, so they pass through the firewall before storage.
         safe_reason = scan(reason, settings.firewall_actions, "reason").data
         try:
@@ -107,7 +113,9 @@ async def execute(
         try:
             await audit(
                 event_type,
-                **body.model_dump(include={"decision", "status", "reason", "policy_version"}),
+                **body.model_dump(
+                    include={"decision", "status", "reason", "policy_version", "approval_id"}
+                ),
                 response_fingerprint=(
                     ledger.fingerprint(body.tool_result) if body.tool_result is not None else None
                 ),
@@ -137,12 +145,29 @@ async def execute(
             raise _invalid(exc) from exc
     arguments = args.model_dump()
 
+    verification: dict[str, Any] = {}
+    if tool.verify:
+        try:
+            verification = await tool.verify(
+                args, session=session, exclude_approval_id=req.approval_id
+            )
+        except Exception:
+            logger.exception("request_id=%s verification failed", request_id)
+            body = ProxyResponse(
+                request_id=request_id,
+                status="blocked",
+                decision="deny",
+                reason="Verification unavailable",
+            )
+            return await finish(body, status.HTTP_503_SERVICE_UNAVAILABLE, event_type="error")
+
     policy_input = {
         "agent": agent.name,
         "tool_name": tool.name,
         "action": tool.action,
         "arguments": arguments,
         "firewall": sorted({f.entity_type for f in findings}),
+        "verification": verification,
     }
     try:
         decision = await opa_client.evaluate(settings, policy_input)
@@ -176,11 +201,30 @@ async def execute(
     if decision.status == "deny":
         return await finish(reply(status="blocked", reason=decision.reason))
 
+    approval_id = None
     if decision.status == "approval_required":
-        # shortcut: nothing is stored yet; the Phase 6 approval workflow will persist it.
-        return await finish(reply(status="pending_approval", reason=decision.reason))
+        if req.approval_id is None:
+            approval = await approvals.create(
+                session,
+                agent=agent,
+                request_id=request_id,
+                tool_name=tool.name,
+                action=tool.action,
+                arguments=arguments,
+                reason=decision.reason,
+                ttl_seconds=settings.approval_ttl_seconds,
+            )
+            body = reply(status="pending_approval", reason=decision.reason, approval_id=approval.id)
+            return await finish(body)
+        rhash = approvals.request_hash(agent, tool.name, tool.action, arguments)
+        try:
+            approval_id = (await approvals.redeem(session, req.approval_id, agent, rhash)).id
+        except approvals.ApprovalError as exc:
+            return await finish(
+                reply(status="blocked", reason=str(exc), approval_id=req.approval_id)
+            )
 
-    # The decision must be on the ledger before the tool runs.
+    # The decision (and any approval use) must be on the ledger before the tool runs.
     try:
         await audit(
             "decision",
@@ -188,12 +232,14 @@ async def execute(
             status="executing",
             reason=decision.reason,
             policy_version=decision.policy_version,
+            approval_id=approval_id,
         )
     except _AuditUnavailableError:
         body = ProxyResponse(request_id=request_id, status="blocked", reason="Audit unavailable")
         return JSONResponse(
             body.model_dump(exclude_none=True), status_code=status.HTTP_503_SERVICE_UNAVAILABLE
         )
+    reply = partial(reply, approval_id=approval_id)
     done = partial(finish, event_type="execution")
 
     try:

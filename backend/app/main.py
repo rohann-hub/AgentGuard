@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api.routes import agents, audit, health, proxy
+from app.api.routes import agents, approvals, audit, health, proxy
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.database.connection import get_engine
@@ -31,7 +31,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     app.include_router(health.router)
-    for module in (agents, audit):
+    for module in (agents, approvals, audit):
         app.include_router(module.router, prefix=settings.api_prefix)
     app.include_router(proxy.router, prefix=settings.api_prefix)
     return app

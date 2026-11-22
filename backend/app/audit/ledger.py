@@ -6,6 +6,7 @@ reordering any stored event breaks verification from that event on.
 
 import hashlib
 import json
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -38,7 +39,7 @@ def _ts(dt: datetime) -> str:
 
 
 def _hashed_fields(e: AuditEvent) -> dict[str, Any]:
-    return {
+    fields = {
         "seq": e.seq,
         "created_at": _ts(e.created_at),
         "request_id": e.request_id,
@@ -55,6 +56,10 @@ def _hashed_fields(e: AuditEvent) -> dict[str, Any]:
         "request_fingerprint": e.request_fingerprint,
         "response_fingerprint": e.response_fingerprint,
     }
+    # Added in Phase 6. Hashed only when set, so events written before it still verify.
+    if e.approval_id is not None:
+        fields["approval_id"] = str(e.approval_id)
+    return fields
 
 
 def compute_hash(prev_hash: str, event: AuditEvent) -> str:
@@ -65,6 +70,7 @@ async def append(
     session: AsyncSession,
     *,
     agent: Agent,
+    approval_id: uuid.UUID | None = None,
     response_fingerprint: str | None = None,
     **fields: Any,
 ) -> AuditEvent:
@@ -78,6 +84,7 @@ async def append(
         created_at=datetime.now(UTC),
         agent_id=agent.id,
         agent_name=agent.name,
+        approval_id=approval_id,
         response_fingerprint=response_fingerprint,
         prev_hash=last.event_hash if last else GENESIS,
         **fields,

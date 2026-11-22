@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.tools import mock_payments
 from app.tools.errors import ToolError
 
 _CUSTOMERS = {
@@ -25,6 +26,7 @@ class CustomerArgs(BaseModel):
 
 class RefundArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    transaction_id: str = Field(pattern=r"^txn_[A-Za-z0-9]{1,32}$")
     customer_id: int = Field(gt=0)
     # shortcut: float amount is fine for a mock; use integer minor units for real payments.
     amount: float = Field(gt=0, le=1_000_000, allow_inf_nan=False)
@@ -47,10 +49,14 @@ async def delete_customer(args: CustomerArgs) -> dict[str, Any]:
 
 
 async def refund(args: RefundArgs) -> dict[str, Any]:
-    _customer(args.customer_id)
+    try:
+        total = await mock_payments.apply_refund(args.transaction_id, args.amount)
+    except (KeyError, ValueError) as exc:
+        raise ToolError("Refund rejected by the payments system") from exc
     return {
         "refunded": True,
-        "customer_id": args.customer_id,
+        "transaction_id": args.transaction_id,
         "amount": args.amount,
+        "total_refunded": total,
         "note": args.note,
     }
