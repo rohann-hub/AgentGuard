@@ -47,3 +47,17 @@ class ApprovalOut(BaseModel):
     expires_at: datetime
     decided_at: datetime | None
     created_at: datetime
+
+
+class ToolOut(BaseModel):
+    name: str
+    action: str
+    verified: bool  # facts are checked against a trusted source before policy runs
+
+
+class Overview(BaseModel):
+    policy_version: str | None  # None when OPA cannot be reached
+    tools: list[ToolOut]
+    agents: dict[str, int]  # by status
+    approvals: dict[str, int]  # by effective status
+    decisions: dict[str, int]  # decision events by policy decision

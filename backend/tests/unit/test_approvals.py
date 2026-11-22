@@ -4,23 +4,14 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.auth.api_keys import hash_api_key
-from app.core.config import get_settings
 from app.database.models import Agent, Approval, AuditEvent
 
 URL = "/api/v1/proxy/execute"
-ADMIN = "test-admin-key"
 REFUND = {
     "tool_name": "payment",
     "action": "refund",
     "arguments": {"transaction_id": "txn_1001", "customer_id": 101, "amount": 8000},
 }
-
-
-@pytest.fixture
-def admin(monkeypatch, make_client):
-    monkeypatch.setenv("AGENTGUARD_ADMIN_API_KEY_HASH", hash_api_key(ADMIN))
-    get_settings.cache_clear()
-    return make_client(headers={"X-Admin-Key": ADMIN})
 
 
 @pytest.fixture

@@ -1,0 +1,194 @@
+@import "tailwindcss";
+
+/* One system: warm neutral grounds, one near-black ink, one accent (teal) for focus,
+   links and the live state. Status tones are quiet tints, never a row of bright dots. */
+:root {
+  --ag-ground: #f4f3ef;
+  --ag-surface: #ffffff;
+  --ag-sunken: #ecebe6;
+  --ag-ink: #1b1a17;
+  --ag-text: #37352f;
+  --ag-muted: #67645b;
+  --ag-line: rgb(27 26 23 / 0.12);
+  --ag-line-strong: rgb(27 26 23 / 0.24);
+  --ag-accent: #0a6b6b;
+  --ag-on-ink: #f4f3ef;
+  --ag-allow: #2b6436;
+  --ag-allow-bg: #e3ede0;
+  --ag-deny: #9a2a20;
+  --ag-deny-bg: #f5e2de;
+  --ag-wait: #7f5300;
+  --ag-wait-bg: #f3e9d3;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ag-ground: #0e0e0d;
+    --ag-surface: #171715;
+    --ag-sunken: #1f1f1c;
+    --ag-ink: #ecebe6;
+    --ag-text: #d6d4cd;
+    --ag-muted: #9e9b91;
+    --ag-line: rgb(236 235 230 / 0.12);
+    --ag-line-strong: rgb(236 235 230 / 0.26);
+    --ag-accent: #5cc4c0;
+    --ag-on-ink: #121211;
+    --ag-allow: #8fcf98;
+    --ag-allow-bg: rgb(143 207 152 / 0.12);
+    --ag-deny: #f0a197;
+    --ag-deny-bg: rgb(240 161 151 / 0.12);
+    --ag-wait: #e6c27a;
+    --ag-wait-bg: rgb(230 194 122 / 0.12);
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  --color-ground: var(--ag-ground);
+  --color-surface: var(--ag-surface);
+  --color-sunken: var(--ag-sunken);
+  --color-ink: var(--ag-ink);
+  --color-text: var(--ag-text);
+  --color-muted: var(--ag-muted);
+  --color-line: var(--ag-line);
+  --color-line-strong: var(--ag-line-strong);
+  --color-accent: var(--ag-accent);
+  --color-on-ink: var(--ag-on-ink);
+  --color-allow: var(--ag-allow);
+  --color-allow-bg: var(--ag-allow-bg);
+  --color-deny: var(--ag-deny);
+  --color-deny-bg: var(--ag-deny-bg);
+  --color-wait: var(--ag-wait);
+  --color-wait-bg: var(--ag-wait-bg);
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --ease-ui: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+html {
+  background: var(--ag-ground);
+  color: var(--ag-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--ag-ground);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ag-accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--ag-accent) 25%, transparent);
+}
+
+@layer components {
+  /* Buttons: 44px, step 1px up on hover, sink and scale .985 on press. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 20px;
+    border-radius: var(--radius-md);
+    font-size: 15px;
+    font-weight: 500;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition:
+      transform 120ms var(--ease-ui),
+      background-color 120ms var(--ease-ui),
+      border-color 120ms var(--ease-ui);
+  }
+  .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  .btn--primary {
+    background: var(--ag-ink);
+    color: var(--ag-on-ink);
+  }
+  .btn--secondary {
+    background: var(--ag-surface);
+    color: var(--ag-ink);
+    border-color: var(--ag-line-strong);
+  }
+  .btn--danger {
+    background: var(--ag-surface);
+    color: var(--ag-deny);
+    border-color: color-mix(in oklab, var(--ag-deny) 45%, transparent);
+  }
+  .btn--sm {
+    height: 36px;
+    padding: 0 14px;
+    font-size: 14px;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .btn:not(:disabled):hover {
+      transform: translateY(-1px);
+      transition-duration: 150ms;
+    }
+    .btn--primary:not(:disabled):hover {
+      background: color-mix(in oklab, var(--ag-ink) 86%, var(--ag-ground));
+    }
+    .btn--secondary:not(:disabled):hover,
+    .btn--danger:not(:disabled):hover {
+      background: var(--ag-sunken);
+      border-color: currentColor;
+    }
+  }
+  .btn:not(:disabled):active {
+    transform: translateY(1px) scale(0.985);
+    transition-duration: 90ms;
+  }
+
+  .link {
+    color: var(--ag-accent);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    text-decoration-color: color-mix(in oklab, var(--ag-accent) 35%, transparent);
+    transition: text-decoration-color 150ms var(--ease-ui);
+  }
+  .link:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .field {
+    height: 44px;
+    width: 100%;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--ag-line-strong);
+    background: var(--ag-surface);
+    color: var(--ag-ink);
+    padding: 0 12px;
+    font-size: 16px;
+  }
+  .field::placeholder {
+    color: var(--ag-muted);
+  }
+  select.field {
+    padding-right: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

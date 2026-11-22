@@ -11,6 +11,6 @@ One guide per roadmap phase: what was built, how it works, and how to use it.
 | 5. Audit ledger | Done | [phase-5.md](phase-5.md) |
 | 6. Human approval & refund verification | Done | [phase-6.md](phase-6.md) |
 | 7. End-to-end testing & hardening | Done | [phase-7.md](phase-7.md) |
-| 8. Admin dashboard | Next | |
-| 9. SDK & integrations | Planned | |
+| 8. Admin dashboard | Done | [phase-8.md](phase-8.md) |
+| 9. SDK & integrations | Next | |
 | 10. Production deployment | Planned | |

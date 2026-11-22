@@ -5,8 +5,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.dashboard import mount_dashboard
 from app.api.limits import BodySizeLimit
-from app.api.routes import agents, approvals, audit, health, proxy
+from app.api.routes import agents, approvals, audit, health, overview, proxy
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.database.connection import get_engine
@@ -33,9 +34,11 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(BodySizeLimit, max_bytes=settings.max_request_bytes)
     app.include_router(health.router)
-    for module in (agents, approvals, audit):
+    for module in (agents, approvals, audit, overview):
         app.include_router(module.router, prefix=settings.api_prefix)
     app.include_router(proxy.router, prefix=settings.api_prefix)
+    if settings.dashboard_dir:
+        mount_dashboard(app, settings.dashboard_dir)
     return app
 
 
