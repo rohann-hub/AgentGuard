@@ -104,6 +104,43 @@ def test_wrong_key_is_rejected():
     assert _execute(READ, "nope").status_code == 401
 
 
+# --- Phase 5: audit ledger on real PostgreSQL ---
+
+DB_URL = os.environ.get(
+    "AGENTGUARD_TEST_DATABASE_URL", "postgresql://agentguard:change-me@localhost:5432/agentguard"
+)
+
+
+def _admin_get(path: str) -> httpx.Response:
+    return httpx.get(f"{BASE_URL}{path}", headers={"X-Admin-Key": ADMIN_KEY}, timeout=10)
+
+
+def test_duplicate_request_id_is_rejected(agent):
+    body = READ | {"request_id": f"dup-{uuid.uuid4().hex}"}
+    assert _execute(body, agent["api_key"]).status_code == 200
+    assert _execute(body, agent["api_key"]).status_code == 409
+
+
+def test_audit_chain_verifies():
+    resp = _admin_get("/api/v1/audit/verify")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["valid"] is True and body["events"] > 0
+
+
+@pytest.mark.parametrize(
+    "sql",
+    ["UPDATE audit_events SET status = 'x'", "DELETE FROM audit_events", "TRUNCATE audit_events"],
+)
+def test_postgres_trigger_blocks_audit_tampering(sql):
+    import psycopg
+
+    with psycopg.connect(DB_URL) as conn:
+        with pytest.raises(psycopg.errors.RaiseException, match="append-only"):
+            conn.execute(sql)
+
+
+# Runs last: it revokes the shared agent.
 def test_revoked_agent_is_rejected(agent):
     resp = httpx.post(
         f"{BASE_URL}/api/v1/agents/{agent['id']}/revoke",

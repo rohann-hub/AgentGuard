@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from sqlalchemy import DateTime, String, Text, func
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, String, Text, func, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 AgentStatus = Literal["active", "revoked"]
@@ -24,3 +24,41 @@ class Agent(Base):
     # SHA-256 hex of the API key. The raw key is shown once at registration and never stored.
     api_key_hash: Mapped[str] = mapped_column(String(64), unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AuditEvent(Base):
+    """Append-only, hash-chained record of every proxy decision and execution outcome.
+
+    Holds only redacted data and fingerprints, never raw arguments or responses.
+    """
+
+    __tablename__ = "audit_events"
+    __table_args__ = (
+        # A request_id can be decided once per agent: duplicates are rejected (409).
+        Index(
+            "uq_audit_decision_request",
+            "agent_id",
+            "request_id",
+            unique=True,
+            postgresql_where=text("event_type = 'decision'"),
+            sqlite_where=text("event_type = 'decision'"),
+        ),
+    )
+
+    seq: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    request_id: Mapped[str] = mapped_column(String(128), index=True)
+    agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"))
+    agent_name: Mapped[str] = mapped_column(String(64))
+    tool_name: Mapped[str] = mapped_column(String(64))
+    action: Mapped[str] = mapped_column(String(64))
+    event_type: Mapped[str] = mapped_column(String(16))  # decision | execution | error
+    decision: Mapped[str | None] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(32))
+    reason: Mapped[str | None] = mapped_column(Text)
+    policy_version: Mapped[str | None] = mapped_column(String(64))
+    firewall: Mapped[list] = mapped_column(JSON)
+    request_fingerprint: Mapped[str] = mapped_column(String(64))
+    response_fingerprint: Mapped[str | None] = mapped_column(String(64))
+    prev_hash: Mapped[str] = mapped_column(String(64))
+    event_hash: Mapped[str] = mapped_column(String(64), unique=True)

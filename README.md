@@ -4,11 +4,11 @@ A security gateway that sits between AI agents and the tools, APIs and data they
 Every tool call is checked against policy (OPA), scanned for PII and secrets, approved by
 a human when risky, and written to a tamper-evident audit log.
 
-This repository is at **Phase 4: PII & secret firewall**. Agents are registered in PostgreSQL
+This repository is at **Phase 5: audit ledger**. Agents are registered in PostgreSQL
 and call `POST /api/v1/proxy/execute` with their API key; AgentGuard validates the request
 against an explicit tool registry, scans it for PII and secrets, asks OPA for a versioned
-decision, runs the tool only when allowed, and scans the response before returning it.
-The audit ledger and approval workflow arrive in later phases.
+decision, records it in a hash-chained audit ledger, runs the tool only when allowed, and
+scans the response before returning it. The approval workflow arrives in Phase 6.
 
 **Guides for each phase are in [docs/](docs/README.md).**
 
@@ -21,6 +21,8 @@ backend/app/
   api/routes/health.py  /health and /health/ready
   api/routes/proxy.py   POST /api/v1/proxy/execute
   api/routes/agents.py  admin APIs: register, list, get, revoke agents
+  api/routes/audit.py   admin APIs: list audit events, verify the hash chain
+  audit/ledger.py       append-only, hash-chained audit ledger
   auth/api_keys.py      agent and admin API keys (stored as SHA-256 hashes)
   firewall/             PII and secret detectors, redact/block scanner
   policy/opa_client.py  OPA decisions; any failure denies (fail closed)
