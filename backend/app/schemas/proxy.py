@@ -19,6 +19,12 @@ class ProxyRequest(BaseModel):
     arguments: dict[str, Any] = Field(default_factory=dict)
 
 
+class FirewallFinding(BaseModel):
+    entity_type: str
+    path: str
+    action: Literal["block", "redact", "allow"]
+
+
 class ProxyResponse(BaseModel):
     request_id: str
     status: Literal["success", "blocked", "pending_approval", "failed"]
@@ -26,3 +32,4 @@ class ProxyResponse(BaseModel):
     reason: str | None = None
     policy_version: str | None = None
     tool_result: dict[str, Any] | None = None
+    firewall: list[FirewallFinding] | None = None

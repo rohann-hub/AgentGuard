@@ -7,8 +7,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.tools.errors import ToolError
 
 _CUSTOMERS = {
-    101: {"customer_id": 101, "name": "Asha Rao", "plan": "pro"},
-    102: {"customer_id": 102, "name": "Vikram Shah", "plan": "free"},
+    101: {
+        "customer_id": 101,
+        "name": "Asha Rao",
+        "email": "asha.rao@example.com",
+        "phone": "+91 98765 43210",
+        "plan": "pro",
+    },
+    102: {"customer_id": 102, "name": "Vikram Shah", "email": "vikram@example.com", "plan": "free"},
 }
 
 
@@ -22,6 +28,7 @@ class RefundArgs(BaseModel):
     customer_id: int = Field(gt=0)
     # shortcut: float amount is fine for a mock; use integer minor units for real payments.
     amount: float = Field(gt=0, le=1_000_000, allow_inf_nan=False)
+    note: str | None = Field(default=None, max_length=500)
 
 
 def _customer(customer_id: int) -> dict[str, Any]:
@@ -41,4 +48,9 @@ async def delete_customer(args: CustomerArgs) -> dict[str, Any]:
 
 async def refund(args: RefundArgs) -> dict[str, Any]:
     _customer(args.customer_id)
-    return {"refunded": True, "customer_id": args.customer_id, "amount": args.amount}
+    return {
+        "refunded": True,
+        "customer_id": args.customer_id,
+        "amount": args.amount,
+        "note": args.note,
+    }
