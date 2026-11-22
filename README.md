@@ -4,7 +4,7 @@ A security gateway that sits between AI agents and the tools, APIs and data they
 Every tool call is checked against policy (OPA), scanned for PII and secrets, approved by
 a human when risky, and written to a tamper-evident audit log.
 
-This repository is at **Phase 6: human approval & refund verification**. Agents are registered in PostgreSQL
+This repository is at **Phase 7: end-to-end testing & hardening** (backend MVP complete). Agents are registered in PostgreSQL
 and call `POST /api/v1/proxy/execute` with their API key; AgentGuard validates the request
 against an explicit tool registry, scans it for PII and secrets, asks OPA for a versioned
 decision (refunds are first verified against trusted payments data), records it in a
@@ -71,7 +71,9 @@ To use your own PostgreSQL, set `AGENTGUARD_DATABASE_URL`; see [docs/phase-3.md]
 ```bash
 pytest                    # unit tests
 pytest -m integration     # needs `docker compose up` first
+pytest -m outage          # stops/starts OPA and Postgres; run on its own
 opa test config/policies backend/tests/policies   # policy tests
+ADMIN_KEY=... ./scripts/demo.sh                    # watch the demo
 ruff check . && ruff format --check .
 ```
 

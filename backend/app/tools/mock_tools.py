@@ -20,12 +20,12 @@ _CUSTOMERS = {
 
 
 class CustomerArgs(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", strict=True)
     customer_id: int = Field(gt=0)
 
 
 class RefundArgs(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", strict=True)
     transaction_id: str = Field(pattern=r"^txn_[A-Za-z0-9]{1,32}$")
     customer_id: int = Field(gt=0)
     # shortcut: float amount is fine for a mock; use integer minor units for real payments.

@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.limits import BodySizeLimit
 from app.api.routes import agents, approvals, audit, health, proxy
 from app.core.config import get_settings
 from app.core.logging import configure_logging
@@ -30,6 +31,7 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json" if settings.docs_enabled else None,
         lifespan=lifespan,
     )
+    app.add_middleware(BodySizeLimit, max_bytes=settings.max_request_bytes)
     app.include_router(health.router)
     for module in (agents, approvals, audit):
         app.include_router(module.router, prefix=settings.api_prefix)

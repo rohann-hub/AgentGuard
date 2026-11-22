@@ -24,6 +24,7 @@ def _seed() -> tuple[dict[str, dict[str, Any]], dict[int, dict[str, Any]]]:
         "txn_1008": {"customer_id": 104, "amount": 1500, "status": "succeeded", "refunded": 0},
         "txn_1009": {"customer_id": 101, "amount": 2500, "status": "succeeded", "refunded": 0},
         "txn_1010": {"customer_id": 101, "amount": 9500, "status": "succeeded", "refunded": 0},
+        "txn_1011": {"customer_id": 101, "amount": 20000, "status": "succeeded", "refunded": 0},
     }
     for tid, days in {"txn_1007": 400}.items():
         transactions[tid]["paid_at"] = _ago(days)

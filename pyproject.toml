@@ -11,8 +11,9 @@ testpaths = ["backend/tests"]
 asyncio_mode = "auto"
 markers = [
     "integration: needs running PostgreSQL and OPA (docker compose up)",
+    "outage: stops and restarts Compose services; run on its own",
 ]
-addopts = "-m 'not integration'"
+addopts = "-m 'not integration and not outage'"
 
 [tool.ruff]
 line-length = 100
