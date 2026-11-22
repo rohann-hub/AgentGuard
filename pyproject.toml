@@ -1,0 +1,23 @@
+[project]
+name = "agentguard"
+version = "0.1.0"
+description = "Security gateway between AI agents and the tools they call."
+requires-python = ">=3.11"
+readme = "README.md"
+
+[tool.pytest.ini_options]
+pythonpath = ["backend"]
+testpaths = ["backend/tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: needs running PostgreSQL and OPA (docker compose up)",
+]
+addopts = "-m 'not integration'"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["backend"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
