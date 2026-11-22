@@ -35,6 +35,8 @@ jobs:
           cache-dependency-path: requirements*.txt
       - run: pip install -r requirements-dev.txt
       - run: cp .env.example .env
+      # Test-only agent whose key is "ci-test-agent-key" (see tests/integration).
+      - run: echo 'AGENTGUARD_AGENT_API_KEYS={"ci-agent":"538553181642c4ea29db02111516a1d6f32eae7217a2c1334f93ae36a1552b0a"}' >> .env
       - run: docker compose up -d --build --wait
       - run: pytest -m integration
       - if: failure()

@@ -10,6 +10,7 @@ services:
       AGENTGUARD_LOG_LEVEL: ${AGENTGUARD_LOG_LEVEL:-INFO}
       AGENTGUARD_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agentguard}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-agentguard}
       AGENTGUARD_OPA_URL: http://opa:8181
+      AGENTGUARD_AGENT_API_KEYS: ${AGENTGUARD_AGENT_API_KEYS:-{}}
     ports:
       - "8000:8000"
     depends_on:
