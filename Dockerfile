@@ -1,3 +1,11 @@
+# Build the admin dashboard (static files only; no Node in the final image).
+FROM node:22-slim AS dashboard
+WORKDIR /dashboard
+COPY dashboard/package.json dashboard/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY dashboard/ ./
+RUN npm run build
+
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -13,6 +21,8 @@ RUN pip install -r requirements.txt
 RUN useradd --create-home --uid 10001 agentguard
 COPY backend/alembic.ini .
 COPY backend/app ./app
+COPY --from=dashboard /dashboard/dist ./dashboard
+ENV AGENTGUARD_DASHBOARD_DIR=/srv/dashboard
 USER agentguard
 
 EXPOSE 8000

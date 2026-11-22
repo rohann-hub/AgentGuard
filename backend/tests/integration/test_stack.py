@@ -224,3 +224,21 @@ def test_revoked_agent_is_rejected(agent):
     )
     assert resp.json()["status"] == "revoked"
     assert _execute(READ, agent["api_key"]).status_code == 401
+
+
+def test_dashboard_is_served_with_strict_headers():
+    resp = httpx.get(f"{BASE_URL}/dashboard/", timeout=10)
+    assert resp.status_code == 200
+    assert '<div id="root">' in resp.text
+    assert "frame-ancestors 'none'" in resp.headers["content-security-policy"]
+    script = resp.text.split('src="/dashboard/assets/')[1].split('"')[0]
+    asset = httpx.get(f"{BASE_URL}/dashboard/assets/{script}", timeout=10)
+    assert asset.status_code == 200 and "javascript" in asset.headers["content-type"]
+
+
+def test_overview_reads_policy_version_from_opa(agent):
+    resp = httpx.get(f"{BASE_URL}/api/v1/overview", headers={"X-Admin-Key": ADMIN_KEY}, timeout=10)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["policy_version"] and body["agents"]["active"] >= 1
+    assert {"name": "payment", "action": "refund", "verified": True} in body["tools"]

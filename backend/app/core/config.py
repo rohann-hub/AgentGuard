@@ -40,6 +40,9 @@ class Settings(BaseSettings):
             raise ValueError("admin_api_key_hash must be a lowercase SHA-256 hex digest")
         return v
 
+    # Folder holding the built admin dashboard, served at /dashboard. Empty: not served.
+    dashboard_dir: str = ""
+
     # Firewall action per entity type, e.g. {"EMAIL": "allow"}. Default: secrets block, PII redacts.
     firewall_actions: dict[str, Literal["block", "redact", "allow"]] = {}
 

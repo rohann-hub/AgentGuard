@@ -5,6 +5,7 @@ import dataclasses
 import pytest
 
 from app.auth.api_keys import hash_api_key
+from app.core.config import get_settings
 from app.database.models import Agent
 from app.policy import opa_client
 from app.policy.opa_client import PolicyDecision
@@ -12,6 +13,7 @@ from app.tools import mock_payments
 from app.tools.registry import REGISTRY
 
 AGENT_KEY = "test-key-support"
+ADMIN = "test-admin-key"
 
 
 @pytest.fixture
@@ -20,6 +22,13 @@ def api(db, make_client):
     db.add(Agent(name="old-agent", status="revoked", api_key_hash=hash_api_key("revoked-key")))
     db.commit()
     return make_client(headers={"X-API-Key": AGENT_KEY})
+
+
+@pytest.fixture
+def admin(monkeypatch, make_client):
+    monkeypatch.setenv("AGENTGUARD_ADMIN_API_KEY_HASH", hash_api_key(ADMIN))
+    get_settings.cache_clear()
+    return make_client(headers={"X-Admin-Key": ADMIN})
 
 
 @pytest.fixture

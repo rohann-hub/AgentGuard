@@ -4,12 +4,13 @@ A security gateway that sits between AI agents and the tools, APIs and data they
 Every tool call is checked against policy (OPA), scanned for PII and secrets, approved by
 a human when risky, and written to a tamper-evident audit log.
 
-This repository is at **Phase 7: end-to-end testing & hardening** (backend MVP complete). Agents are registered in PostgreSQL
+This repository is at **Phase 8: admin dashboard**. Agents are registered in PostgreSQL
 and call `POST /api/v1/proxy/execute` with their API key; AgentGuard validates the request
 against an explicit tool registry, scans it for PII and secrets, asks OPA for a versioned
 decision (refunds are first verified against trusted payments data), records it in a
 hash-chained audit ledger, runs the tool only when allowed or approved by a human, and scans
-the response before returning it.
+the response before returning it. Admins use the dashboard at `/dashboard/` to approve held
+requests, manage agents and read the audit log.
 
 **Guides for each phase are in [docs/](docs/README.md).**
 
@@ -24,6 +25,8 @@ backend/app/
   api/routes/agents.py  admin APIs: register, list, get, revoke agents
   api/routes/audit.py   admin APIs: list audit events, verify the hash chain
   api/routes/approvals.py  admin APIs: list, approve, reject approvals
+  api/routes/overview.py   admin API: tools, live policy version, counts
+  api/dashboard.py      serves the built dashboard with strict security headers
   audit/ledger.py       append-only, hash-chained audit ledger
   approvals/service.py  approvals bound to the exact request, single use, expiring
   verification/         facts from trusted systems for policy (refunds)
@@ -42,6 +45,7 @@ backend/app/
 backend/tests/
   unit/                 fast tests, no services needed
   integration/          run against the Compose stack
+dashboard/               admin dashboard (React, TypeScript, Tailwind, Vite)
 config/policies/        Rego policies loaded by OPA (deny by default, deny wins)
 ```
 
@@ -53,6 +57,7 @@ docker compose up -d --build --wait
 curl localhost:8000/health/ready
 ```
 
+The dashboard is at http://localhost:8000/dashboard/ (sign in with the admin key).
 API docs are at http://localhost:8000/docs (hidden when `AGENTGUARD_ENV=production`).
 OPA (8181) and PostgreSQL (5432) are bound to 127.0.0.1 only.
 
@@ -75,6 +80,7 @@ pytest -m outage          # stops/starts OPA and Postgres; run on its own
 opa test config/policies backend/tests/policies   # policy tests
 ADMIN_KEY=... ./scripts/demo.sh                    # watch the demo
 ruff check . && ruff format --check .
+cd dashboard && npm ci && npm run typecheck && npm test   # dashboard
 ```
 
 ## Health endpoints

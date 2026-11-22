@@ -6,7 +6,6 @@ from sqlalchemy.exc import OperationalError
 
 from app.audit import ledger
 from app.auth.api_keys import hash_api_key
-from app.core.config import get_settings
 from app.database.models import Agent, AuditEvent
 from app.policy import opa_client
 from app.policy.opa_client import PolicyUnavailableError
@@ -14,16 +13,8 @@ from app.tools.errors import ToolError
 from app.tools.registry import REGISTRY
 
 URL = "/api/v1/proxy/execute"
-ADMIN = "test-admin-key"
 READ = {"tool_name": "database", "action": "read", "arguments": {"customer_id": 101}}
 SECRET = "AKIAIOSFODNN7EXAMPLE"
-
-
-@pytest.fixture
-def admin(monkeypatch, make_client):
-    monkeypatch.setenv("AGENTGUARD_ADMIN_API_KEY_HASH", hash_api_key(ADMIN))
-    get_settings.cache_clear()
-    return make_client(headers={"X-Admin-Key": ADMIN})
 
 
 def _events(db) -> list[AuditEvent]:

@@ -7,4 +7,5 @@ venv
 **/.pytest_cache
 .ruff_cache
 docs
-dashboard
+dashboard/node_modules
+dashboard/dist
