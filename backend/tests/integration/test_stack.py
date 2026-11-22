@@ -69,7 +69,12 @@ def test_secret_in_arguments_is_blocked(agent):
         {
             "tool_name": "payment",
             "action": "refund",
-            "arguments": {"customer_id": 101, "amount": 10, "note": "key AKIAIOSFODNN7EXAMPLE"},
+            "arguments": {
+                "transaction_id": "txn_1009",
+                "customer_id": 101,
+                "amount": 10,
+                "note": "key AKIAIOSFODNN7EXAMPLE",
+            },
         },
         agent["api_key"],
     )
@@ -92,7 +97,7 @@ def test_refund_needs_approval(agent):
         {
             "tool_name": "payment",
             "action": "refund",
-            "arguments": {"customer_id": 101, "amount": 8000},
+            "arguments": {"transaction_id": "txn_1001", "customer_id": 101, "amount": 8000},
         },
         agent["api_key"],
     )
@@ -138,6 +143,76 @@ def test_postgres_trigger_blocks_audit_tampering(sql):
     with psycopg.connect(DB_URL) as conn:
         with pytest.raises(psycopg.errors.RaiseException, match="append-only"):
             conn.execute(sql)
+
+
+# --- Phase 6: refund verification and approvals on the real stack ---
+
+
+def _refund(txn: str, customer: int, amount: float, **extra) -> dict:
+    return {
+        "tool_name": "payment",
+        "action": "refund",
+        "arguments": {"transaction_id": txn, "customer_id": customer, "amount": amount},
+    } | extra
+
+
+@pytest.mark.parametrize(
+    ("body", "reason"),
+    [
+        (_refund("txn_9999", 101, 10), "Transaction not found"),
+        (_refund("txn_1003", 101, 10), "Original payment was not completed"),
+        (_refund("txn_1002", 101, 10), "Transaction is already fully refunded"),
+        (_refund("txn_1009", 101, 2600), "Refund exceeds the refundable balance"),
+        (_refund("txn_1009", 102, 10), "Transaction belongs to a different customer"),
+        (_refund("txn_1006", 103, 10), "Customer is not eligible: customer account is not active"),
+        (_refund("txn_1001", 101, 11000), "Refund exceeds the maximum of 10000"),
+    ],
+)
+def test_invalid_refunds_are_denied(agent, body, reason):
+    resp = _execute(body, agent["api_key"])
+    assert resp.status_code == 403, resp.text
+    assert reason in resp.json()["reason"]
+
+
+def test_risky_small_refund_needs_review(agent):
+    resp = _execute(_refund("txn_1004", 102, 100), agent["api_key"])
+    assert resp.status_code == 202, resp.text
+    assert resp.json()["reason"] == "Risk signals: new_account"
+
+
+def test_small_clean_refund_runs(agent):
+    resp = _execute(_refund("txn_1009", 101, 100), agent["api_key"])
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["tool_result"]["total_refunded"] >= 100
+
+
+def test_approval_flow_end_to_end(agent):
+    key = agent["api_key"]
+    ask = _execute(_refund("txn_1010", 101, 8000), key)
+    assert ask.status_code == 202, ask.text
+    approval_id = ask.json()["approval_id"]
+
+    # A second refund for the same transaction is refused while one is pending.
+    dup = _execute(_refund("txn_1010", 101, 500), key)
+    assert dup.json()["reason"] == "A refund for this transaction is already pending"
+
+    approve = httpx.post(
+        f"{BASE_URL}/api/v1/approvals/{approval_id}/approve",
+        headers={"X-Admin-Key": ADMIN_KEY},
+        timeout=10,
+    )
+    assert approve.json()["status"] == "approved"
+
+    tampered = _execute(_refund("txn_1010", 101, 9000, approval_id=approval_id), key)
+    assert tampered.json()["reason"] == "Approval does not match this request"
+
+    run = _execute(_refund("txn_1010", 101, 8000, approval_id=approval_id), key)
+    assert run.status_code == 200, run.text
+    assert run.json()["tool_result"]["refunded"] is True
+
+    replay = _execute(_refund("txn_1010", 101, 8000, approval_id=approval_id), key)
+    assert replay.status_code == 403
+    assert _admin_get("/api/v1/audit/verify").json()["valid"] is True
 
 
 # Runs last: it revokes the shared agent.

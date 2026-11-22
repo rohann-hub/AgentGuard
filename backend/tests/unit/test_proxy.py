@@ -18,7 +18,7 @@ DELETE = {"tool_name": "database", "action": "delete", "arguments": {"customer_i
 REFUND = {
     "tool_name": "payment",
     "action": "refund",
-    "arguments": {"customer_id": 101, "amount": 8000},
+    "arguments": {"transaction_id": "txn_1001", "customer_id": 101, "amount": 8000},
 }
 
 
@@ -128,6 +128,7 @@ def test_allow_executes_tool(api, policy, tool_calls):
             "action": "read",
             "arguments": {"customer_id": 101},
             "firewall": [],
+            "verification": {},
         }
     ]
 
@@ -149,7 +150,12 @@ def test_approval_required_does_not_execute(api, policy, tool_calls):
     body = resp.json()
     assert (body["status"], body["decision"]) == ("pending_approval", "approval_required")
     assert tool_calls == []
-    assert calls[0]["arguments"] == {"customer_id": 101, "amount": 8000.0, "note": None}
+    assert calls[0]["arguments"] == {
+        "transaction_id": "txn_1001",
+        "customer_id": 101,
+        "amount": 8000.0,
+        "note": None,
+    }
 
 
 def test_fails_closed_when_opa_unavailable(api, monkeypatch, tool_calls):
@@ -259,7 +265,9 @@ async def test_opa_client_fails_closed_when_unreachable(monkeypatch):
 
 
 def _refund_with(note):
-    return REFUND | {"arguments": {"customer_id": 101, "amount": 100, "note": note}}
+    return REFUND | {
+        "arguments": {"transaction_id": "txn_1009", "customer_id": 101, "amount": 100, "note": note}
+    }
 
 
 def test_secret_in_arguments_is_blocked_before_policy(api, policy, tool_calls):

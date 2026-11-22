@@ -1,5 +1,6 @@
 """Request and response bodies for POST /api/v1/proxy/execute."""
 
+import uuid
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -17,6 +18,8 @@ class ProxyRequest(BaseModel):
     tool_name: str = Field(min_length=1, max_length=64)
     action: str = Field(min_length=1, max_length=64)
     arguments: dict[str, Any] = Field(default_factory=dict)
+    # Set when resubmitting a request that a human approved.
+    approval_id: uuid.UUID | None = None
 
 
 class FirewallFinding(BaseModel):
@@ -31,5 +34,6 @@ class ProxyResponse(BaseModel):
     decision: Decision | None = None
     reason: str | None = None
     policy_version: str | None = None
+    approval_id: uuid.UUID | None = None
     tool_result: dict[str, Any] | None = None
     firewall: list[FirewallFinding] | None = None

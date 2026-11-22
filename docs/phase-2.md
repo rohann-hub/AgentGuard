@@ -60,7 +60,8 @@ curl -s localhost:8000/api/v1/proxy/execute \
 
 `request_id` is optional; one is generated when missing. Mock customers are 101 and 102.
 Since Phase 4 the customer record also has an email and phone, which the firewall redacts
-(see [phase-4.md](phase-4.md)).
+(see [phase-4.md](phase-4.md)). Since Phase 6, `payment.refund` also needs a
+`transaction_id` and is verified first (see [phase-6.md](phase-6.md)).
 
 ### Adding a tool
 

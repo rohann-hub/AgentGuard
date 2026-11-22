@@ -22,6 +22,8 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest
+      - name: OPA policy tests
+        run: docker run --rm -v "$PWD/config/policies:/p:ro" -v "$PWD/backend/tests/policies:/t:ro" openpolicyagent/opa:1.4.2 test /p /t -v
 
   stack:
     runs-on: ubuntu-latest

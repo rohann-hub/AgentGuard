@@ -61,7 +61,7 @@ def test_non_executed_decisions_record_one_event(api, policy, db, decision, stat
 
 def test_firewall_block_is_recorded(api, policy, db):
     policy("allow")
-    note = {"customer_id": 101, "amount": 5, "note": SECRET}
+    note = {"transaction_id": "txn_1009", "customer_id": 101, "amount": 5, "note": SECRET}
     api.post(URL, json={"tool_name": "payment", "action": "refund", "arguments": note})
     (event,) = _events(db)
     assert event.status == "blocked" and event.decision is None
@@ -163,7 +163,12 @@ def test_audit_never_stores_raw_secrets_or_pii(api, policy, monkeypatch, db, adm
 
     key = ("payment", "refund")
     monkeypatch.setitem(REGISTRY, key, dataclasses.replace(REGISTRY[key], handler=leaky))
-    note = {"customer_id": 101, "amount": 5, "note": "email asha.rao@example.com"}
+    note = {
+        "transaction_id": "txn_1009",
+        "customer_id": 101,
+        "amount": 5,
+        "note": "email asha.rao@example.com",
+    }
     api.post(URL, json={"tool_name": "payment", "action": "refund", "arguments": note})
     api.post(URL, json=READ)  # response holds email and phone
 

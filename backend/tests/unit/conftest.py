@@ -8,6 +8,7 @@ from app.auth.api_keys import hash_api_key
 from app.database.models import Agent
 from app.policy import opa_client
 from app.policy.opa_client import PolicyDecision
+from app.tools import mock_payments
 from app.tools.registry import REGISTRY
 
 AGENT_KEY = "test-key-support"
@@ -49,3 +50,10 @@ def tool_calls(monkeypatch):
 
         monkeypatch.setitem(REGISTRY, key, dataclasses.replace(tool, handler=spy))
     return calls
+
+
+@pytest.fixture(autouse=True)
+def _fresh_payments():
+    mock_payments.reset()
+    yield
+    mock_payments.reset()
