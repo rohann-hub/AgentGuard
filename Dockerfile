@@ -11,6 +11,7 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 RUN useradd --create-home --uid 10001 agentguard
+COPY backend/alembic.ini .
 COPY backend/app ./app
 USER agentguard
 

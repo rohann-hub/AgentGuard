@@ -24,4 +24,5 @@ class ProxyResponse(BaseModel):
     status: Literal["success", "blocked", "pending_approval", "failed"]
     decision: Decision | None = None
     reason: str | None = None
+    policy_version: str | None = None
     tool_result: dict[str, Any] | None = None

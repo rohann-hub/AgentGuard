@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api.routes import health, proxy
+from app.api.routes import agents, health, proxy
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.database.connection import get_engine
@@ -31,6 +31,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     app.include_router(health.router)
+    app.include_router(agents.router, prefix=settings.api_prefix)
     app.include_router(proxy.router, prefix=settings.api_prefix)
     return app
 

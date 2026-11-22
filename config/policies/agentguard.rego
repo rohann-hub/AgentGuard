@@ -4,12 +4,17 @@ package agentguard
 
 import rego.v1
 
-default decision := {
+# Bump on every policy change; it is returned with each decision.
+policy_version := "2026-11-22.1"
+
+decision := object.union(result, {"policy_version": policy_version})
+
+default result := {
 	"status": "deny",
 	"reason": "No matching policy (default deny)",
 }
 
-decision := {"status": "deny", "reason": concat("; ", sort(deny))} if {
+result := {"status": "deny", "reason": concat("; ", sort(deny))} if {
 	count(deny) > 0
 } else := {"status": "approval_required", "reason": concat("; ", sort(approval_required))} if {
 	count(approval_required) > 0
